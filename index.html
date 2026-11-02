@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Director Kollo Studios</title>
+    <meta
+      name="theme-color"
+      content="#4b22b0"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#1c2250"
+      media="(prefers-color-scheme: dark)"
+    />
+    <meta
+      name="description"
+      content="Photography client, session and photo-selection tracker for Director Kollo Studios"
+    />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Kollo Studios" />
+    <script src="/theme-init.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=DM+Sans:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Critical loader styles: inline so the loader is styled and centred from the very first paint (before the app CSS loads) */
+      html,
+      body {
+        margin: 0;
+        background: #eaf3fc;
+      }
+      html[data-theme="dark"],
+      html[data-theme="dark"] body {
+        background: #0e1124;
+      }
+      .ldr {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: grid;
+        place-items: center;
+        background: #eaf3fc;
+      }
+      html[data-theme="dark"] .ldr {
+        background: #0e1124;
+      }
+      .ldr svg {
+        display: block;
+      }
+      .ldr-t {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(50% + 84px);
+        text-align: center;
+        font:
+          500 14px "DM Sans",
+          system-ui,
+          sans-serif;
+        color: #646a8a;
+        letter-spacing: 0.02em;
+      }
+      html[data-theme="dark"] .ldr-t {
+        color: #9ba1c7;
+      }
+      .ldr-r {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: ldr-ring 1.5s ease-out infinite;
+      }
+      .ldr-d {
+        animation-delay: 0.75s;
+      }
+      .ldr-b {
+        animation: ldr-bob 1.5s ease-in-out infinite;
+      }
+      @keyframes ldr-ring {
+        0% {
+          transform: scale(1);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(1.9);
+          opacity: 0;
+        }
+      }
+      @keyframes ldr-bob {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-3px);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ldr-r,
+        .ldr-b {
+          animation: none;
+        }
+        .ldr-r {
+          opacity: 0.35;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="ldr" role="status">
+        <svg
+          width="150"
+          height="150"
+          viewBox="-33 -33 130 130"
+          aria-hidden="true"
+        >
+          <circle
+            class="ldr-r"
+            cx="32"
+            cy="32"
+            r="31"
+            fill="none"
+            stroke="#f59a1f"
+            stroke-width="2.5"
+          />
+          <circle
+            class="ldr-r ldr-d"
+            cx="32"
+            cy="32"
+            r="31"
+            fill="none"
+            stroke="#f59a1f"
+            stroke-width="2.5"
+          />
+          <g class="ldr-b">
+            <circle cx="32" cy="32" r="31" fill="#f59a1f" />
+            <rect x="14" y="22" width="36" height="26" rx="5" fill="#4b22b0" />
+            <rect x="21" y="17" width="12" height="7" rx="2" fill="#4b22b0" />
+            <rect x="40" y="25" width="6" height="3" rx="1.5" fill="#f59a1f" />
+            <circle cx="32" cy="36" r="9" fill="#fff" />
+            <circle cx="32" cy="36" r="5.5" fill="#4b22b0" />
+            <circle cx="30" cy="34" r="1.6" fill="#fff" />
+          </g></svg
+        ><span class="ldr-t">Loading</span>
+      </div>
+    </div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

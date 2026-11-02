@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.example
+LAUNCH-CHECKLIST.md
+vite.config.js
+package-lock.json
+package.json
+supabase
+README.md

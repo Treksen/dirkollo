@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Director Kollo Studios",
+  "short_name": "Kollo Studios",
+  "description": "Photography client, session and photo-selection tracker",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "en",
+  "categories": ["business", "productivity"],
+  "background_color": "#eaf3fc",
+  "theme_color": "#4b22b0",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
