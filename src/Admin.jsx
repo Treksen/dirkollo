@@ -343,11 +343,14 @@ function shrink(file, max) {
 function StudioSettings({ S, reload, say }) {
   const D = { ...DEF, ...S, contact: { ...DEF.contact, ...(S.contact || {}) } }
   const [up, setUp] = useState(false)
-  const [f, setF] = useState({
+  const initial = {
     name: D.name, kicker: D.kicker, headline: D.headline, sub: D.sub, about: D.about, currency: S.currency ?? 'KSh ',
     staffScope: S.staffScope || 'assigned', minVersion: S.minVersion || '', requireMfa: !!S.requireMfa, limShot: String(S.stageLimits?.Shot ?? 3), limSel: String(S.stageLimits?.Selecting ?? 7), limEdit: String(S.stageLimits?.Editing ?? 14), ...D.contact,
     services: D.services.map((x) => x.join(' | ')).join('\n'), steps: D.steps.map((x) => x.join(' | ')).join('\n'),
-  })
+  }
+  const [f, setF] = useState(initial)
+  const [base, setBase] = useState(() => JSON.stringify(initial)) // what was last saved, to tell whether there are unsaved changes
+  const dirty = JSON.stringify(f) !== base
   const gal = Array.isArray(S.gallery) ? S.gallery : []
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
   const lines = (t, n) => t.split('\n').map((l) => l.split('|').map((x) => x.trim())).filter((a) => a[0] && a.length >= n).map((a) => a.slice(0, n === 3 ? 3 : 2))
@@ -373,7 +376,7 @@ function StudioSettings({ S, reload, say }) {
       services: lines(f.services, 3), steps: lines(f.steps, 2),
     }
     const { error } = await put(data)
-    if (error) say(error.message + ' (Run supabase/admin-update.sql first.)'); else { reload(); say('Saved. The landing page, currency and staff access are updated.') }
+    if (error) say(error.message + ' (Run supabase/admin-update.sql first.)'); else { setBase(JSON.stringify(f)); reload(); say('Saved. The landing page, currency and staff access are updated.') }
   }
   async function addPhotos(e) {
     const files = [...e.target.files]; e.target.value = ''
@@ -442,7 +445,10 @@ function StudioSettings({ S, reload, say }) {
         <div className="sub" style={{ marginTop: 6 }}>Staff and Directors on an older version are blocked with "Update required" while online. You are running {APP_VERSION}, and you are never blocked yourself. Only set a version that is already deployed.</div></div>
       <div className="card"><div className="lab">Currency</div><label>Currency symbol (used on every device)</label><input maxLength={6} value={f.currency} onChange={set('currency')} /></div>
       </div>
-      <button className="btn p" style={{ width: '100%', marginTop: 4 }} onClick={save}>Save studio settings</button>
+      <div className={'savebar' + (dirty ? ' dirty' : '')} role="region" aria-label="Save studio settings">
+        <span className="sub">{dirty ? 'You have unsaved changes.' : 'No unsaved changes.'}</span>
+        <button className="btn p" onClick={save}>Save studio settings</button>
+      </div>
     </>
   )
 }
@@ -494,7 +500,10 @@ function Devices({ T, run }) {
 }
 
 export function Admin({ C, A, T, S, say, ask, run, reload, closeSheet }) {
-  const [sec, setSec] = useState('ov')
+  const [sec, setSec] = useState(() => {
+    try { const v = sessionStorage.getItem('dk_admin_sec'); return ['ov', 'log', 'data', 'dev', 'st'].includes(v) ? v : 'ov' } catch { return 'ov' }
+  })
+  useEffect(() => { try { sessionStorage.setItem('dk_admin_sec', sec) } catch { /* ignore */ } }, [sec])
   const desk = useDesktop()
   const items = [['ov', 'Overview'], ['log', 'Activity'], ['data', 'Data tools'], ['dev', 'Devices'], ['st', 'Studio']]
   const body = (

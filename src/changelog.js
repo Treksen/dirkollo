@@ -3,6 +3,14 @@ import { versionCmp } from './version'
 // Add a new entry at the TOP for every release, and bump "version" in package.json to match.
 export const CHANGELOG = [
   {
+    v: '2.5.3', date: '2026-11-03',
+    items: ['Refreshing the page now keeps you on the page you were on (and the section inside Settings and Admin), instead of going back to Home.'],
+  },
+  {
+    v: '2.5.2', date: '2026-11-02',
+    items: ['Admin > Studio: the Save button now stays in view at the bottom of the screen and tells you when there are unsaved changes.'],
+  },
+  {
     v: '2.5.1', date: '2026-11-01',
     items: ['A light/dark switch button now sits next to the page title, on every screen.'],
   },

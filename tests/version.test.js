@@ -29,5 +29,5 @@ describe("what's new", () => {
     expect(l.map((e) => e.v)).toEqual(['2.2.0', '2.1.0'])
   })
   it('lists nothing when you are already up to date', () => { expect(newerEntries('2.2.0', '2.2.0')).toEqual([]) })
-  it('keeps the newest entry at the top of the changelog', () => { expect(CHANGELOG[0].v).toBe('2.5.1') })
+  it('keeps the newest entry at the top of the changelog', () => { expect(CHANGELOG[0].v).toBe('2.5.3') })
 })

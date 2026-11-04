@@ -25,6 +25,22 @@ const applyMeta = (r) => {
   if (r.S && r.S.currency != null && r.S.currency !== getCur()) setCur(r.S.currency)
   if (r.S) setLimits(r.S.stageLimits)
 }
+// Where the person was, kept for this browser tab so a refresh returns to the same page (not the dashboard)
+const TABS = ['h', 'c', 's', 'm', 'r', 'g', 'a', 'x']
+function readNav(owner, isAdmin) {
+  let n = {}
+  try { n = JSON.parse(sessionStorage.getItem('dk_nav') || '{}') || {} } catch { n = {} }
+  let tab = TABS.includes(n.tab) ? n.tab : 'h'
+  if ((!owner && (tab === 'm' || tab === 'r')) || (!isAdmin && tab === 'a')) tab = 'h'
+  return {
+    tab,
+    det: typeof n.det === 'string' ? n.det : null,
+    sg: ['ac', 'tm', 'pk', 'dt', 'ap'].includes(n.sg) ? n.sg : 'ac',
+    flt: typeof n.flt === 'string' ? n.flt : 'All',
+    sd: /^\d{4}-\d{2}-\d{2}$/.test(n.sd || '') ? n.sd : null,
+    cm: /^\d{4}-\d{2}$/.test(n.cm || '') ? new Date(n.cm + '-01T00:00') : new Date(),
+  }
+}
 const TABLES_CLIENT = ['client_assignments', 'client_finance', 'payments']
 const NOCOPY = 'This phone has no saved copy yet. Connect to the internet once to download your clients.'
 const OPNAME = { save: 'Client details', patch: 'Status or gallery link', pay: 'Payment' }
@@ -75,13 +91,14 @@ function Studio({ session, profile, reloadProfile }) {
   const isAdmin = profile.role === 'admin'
   const myid = session.user.id
   const [D, setD] = useState({ C: [], A: [], T: [], P: [], R: { extra: 500, weekend: 15, disc: 0 }, S: {}, err: '', loaded: false })
-  const [tab, setTab] = useState('h')
-  const [det, setDet] = useState(null)
+  const [nav0] = useState(() => readNav(owner, isAdmin))
+  const [tab, setTab] = useState(nav0.tab)
+  const [det, setDet] = useState(nav0.det)
   const [q, setQ] = useState('')
-  const [flt, setFlt] = useState('All')
-  const [cm, setCm] = useState(new Date())
-  const [sd, setSd] = useState(null)
-  const [sg, setSg] = useState('ac')
+  const [flt, setFlt] = useState(nav0.flt)
+  const [cm, setCm] = useState(nav0.cm)
+  const [sd, setSd] = useState(nav0.sd)
+  const [sg, setSg] = useState(nav0.sg)
   const [sheet, setSheet] = useState(null)
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('theme') || 'light' } catch { return 'light' } })
   const [inst, setInst] = useState(null)
@@ -201,6 +218,14 @@ function Studio({ session, profile, reloadProfile }) {
     return () => { alive = false; clearTimeout(timer.current); supabase.removeChannel(ch) }
   }, [myid, reload, flushLive, syncNow])
 
+  // remember the current page, and make the browser's own history entry match it
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('dk_nav', JSON.stringify({ tab, det, sg, flt, sd, cm: cm.getFullYear() + '-' + String(cm.getMonth() + 1).padStart(2, '0') }))
+    } catch { /* storage blocked */ }
+  }, [tab, det, sg, flt, sd, cm])
+  useEffect(() => { try { history.replaceState({ t: tab, d: det }, '') } catch { /* ignore */ } }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // keep a saved copy of everything on this phone, so the lists open with no signal
   useEffect(() => {
     if (!D.loaded || (D.err && !D.C.length)) return undefined
@@ -306,7 +331,11 @@ function Studio({ session, profile, reloadProfile }) {
     await refresh(ids)
     return true
   }
-  const doSignOut = async () => { await clearOffline(myid); clearLast(); await supabase.auth.signOut() }
+  const doSignOut = async () => {
+    await clearOffline(myid); clearLast()
+    try { sessionStorage.removeItem('dk_nav'); sessionStorage.removeItem('dk_admin_sec') } catch { /* ignore */ }
+    await supabase.auth.signOut()
+  }
   const signOut = () => {
     if (queue.length) ask('You have ' + plural(queue.length, 'change') + ' that ' + (queue.length > 1 ? 'have' : 'has') + ' not been sent yet. If you sign out now, ' + (queue.length > 1 ? 'they are' : 'it is') + ' lost for good.', 'Sign out and lose them', doSignOut, 1)
     else doSignOut()
@@ -371,342 +400,85 @@ function Studio({ session, profile, reloadProfile }) {
   return (
     <>
       <div className="hd">
-        <button
-          className="av"
-          aria-label="Profile and settings"
-          onClick={() => setSheet({ t: "profile" })}
-        >
-          <span className="ph" style={phStyle}>
-            {profile.avatar ? "" : init}
-          </span>
-          <span className="nm">
-            <b>{profile.name}</b>
-            <span>{dl(profile.role)}</span>
-          </span>
+        <button className="av" aria-label="Profile and settings" onClick={() => setSheet({ t: 'profile' })}>
+          <span className="ph" style={phStyle}>{profile.avatar ? '' : init}</span>
+          <span className="nm"><b>{profile.name}</b><span>{dl(profile.role)}</span></span>
         </button>
-        <div className="in">
-          <Brand />
-        </div>
+        <div className="in"><Brand /></div>
       </div>
       {upd.needRefresh && (
         <div className="offl upd" role="status">
           A new version of the app is ready.
-          <button
-            className="chip"
-            onClick={() =>
-              sheet && ["form", "pay", "pk"].includes(sheet.t)
-                ? ask(
-                    "You have a form open. Updating reloads the app and clears it. Update anyway?",
-                    "Update now",
-                    applyUpdate,
-                  )
-                : applyUpdate()
-            }
-          >
-            Update now
-          </button>
+          <button className="chip" onClick={() => (sheet && ['form', 'pay', 'pk'].includes(sheet.t)
+            ? ask('You have a form open. Updating reloads the app and clears it. Update anyway?', 'Update now', applyUpdate)
+            : applyUpdate())}>Update now</button>
         </div>
       )}
       {bannerOn && (
-        <div
-          className={
-            "offl" +
-            (failed.length || ageDays >= 3
-              ? " bad"
-              : ageDays >= 1
-                ? " stale"
-                : "")
-          }
-          role="status"
-        >
-          {failed.length ? (
-            <>
-              {plural(failed.length, "change")} could not be saved.{" "}
-              <button className="chip" onClick={() => setSheet({ t: "sync" })}>
-                Review
-              </button>
-            </>
-          ) : needSignIn ? (
-            <>
-              Sign in again to send your {plural(waitingCount, "change")}.{" "}
-              <button className="chip" onClick={() => supabase.auth.signOut()}>
-                Sign in
-              </button>
-            </>
-          ) : !online ? (
-            <>
-              You are offline. Your changes are saved on this phone and are sent
-              when you are back online.
-              {waitingCount
-                ? " " + plural(waitingCount, "change") + " waiting."
-                : ""}
-              {ageNote}
-            </>
-          ) : (
-            <>
-              Sending {plural(waitingCount, "change")}…{ageNote}{" "}
-              <button className="chip" onClick={syncNow}>
-                Sync now
-              </button>
-            </>
-          )}
+        <div className={'offl' + (failed.length || ageDays >= 3 ? ' bad' : ageDays >= 1 ? ' stale' : '')} role="status">
+          {failed.length ? <>{plural(failed.length, 'change')} could not be saved. <button className="chip" onClick={() => setSheet({ t: 'sync' })}>Review</button></>
+            : needSignIn ? <>Sign in again to send your {plural(waitingCount, 'change')}. <button className="chip" onClick={() => supabase.auth.signOut()}>Sign in</button></>
+              : !online ? <>You are offline. Your changes are saved on this phone and are sent when you are back online.{waitingCount ? ' ' + plural(waitingCount, 'change') + ' waiting.' : ''}{ageNote}</>
+                  : <>Sending {plural(waitingCount, 'change')}…{ageNote} <button className="chip" onClick={syncNow}>Sync now</button></>}
         </div>
       )}
       <div className="wrap">
         <div className="phead">
           <h1>{title}</h1>
           <div className="pageact">
-            {desk && tab === "h" && (
+            <button className="btn themebtn" onClick={() => setTheme(isDark ? 'light' : 'dark')} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+              {isDark ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
+              )}
+            </button>
+            {desk && tab === 'h' && (
               <>
-                <button
-                  className="btn o"
-                  onClick={() => setSheet({ t: "form" })}
-                >
-                  + New client
-                </button>
-                <button className="btn" onClick={() => go("s")}>
-                  Open calendar
-                </button>
-                <button
-                  className="btn themebtn"
-                  onClick={() => setTheme(isDark ? "light" : "dark")}
-                  aria-label={
-                    isDark ? "Switch to light mode" : "Switch to dark mode"
-                  }
-                  title={
-                    isDark ? "Switch to light mode" : "Switch to dark mode"
-                  }
-                >
-                  {isDark ? (
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      aria-hidden="true"
-                    >
-                      <circle cx="12" cy="12" r="4" />
-                      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-                    </svg>
-                  ) : (
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-                    </svg>
-                  )}
-                </button>
+                <button className="btn o" onClick={() => setSheet({ t: 'form' })}>+ New client</button>
+                <button className="btn" onClick={() => go('s')}>Open calendar</button>
               </>
             )}
           </div>
         </div>
         <div id="view">
-          {!c && "mrga".includes(tab) && (tab === "g" || owner) && (
-            <button className="back mbo" onClick={() => go("x")}>
-              ‹ More
-            </button>
-          )}
+          {!c && 'mrga'.includes(tab) && (tab === 'g' || owner) && <button className="back mbo" onClick={() => go('x')}>‹ More</button>}
           {D.err && <div className="warn">{D.err}</div>}
-          {tab === "c" && desk ? (
-            <ClientsDesk
-              X={X}
-              selId={det}
-              panel={c ? detailEl(c, true) : null}
-            />
-          ) : c ? (
-            detailEl(c, false)
-          ) : (
-            <View X={X} />
-          )}
+          {tab === 'c' && desk ? <ClientsDesk X={X} selId={det} panel={c ? detailEl(c, true) : null} /> : c ? detailEl(c, false) : <View X={X} />}
         </div>
       </div>
       <nav className="tabs">
-        <button className={hl === "h" ? "on" : ""} onClick={() => go("h")}>
-          Home
-        </button>
-        <button className={hl === "c" ? "on" : ""} onClick={() => go("c")}>
-          Clients
-        </button>
-        <button
-          className="fab"
-          aria-label="Add client"
-          onClick={() => setSheet({ t: "form" })}
-        >
-          <span className="fp">+</span>
-          <span className="fl">Add client</span>
-        </button>
-        <button className={hl === "s" ? "on" : ""} onClick={() => go("s")}>
-          Calendar
-        </button>
+        <button className={hl === 'h' ? 'on' : ''} onClick={() => go('h')}>Home</button>
+        <button className={hl === 'c' ? 'on' : ''} onClick={() => go('c')}>Clients</button>
+        <button className="fab" aria-label="Add client" onClick={() => setSheet({ t: 'form' })}><span className="fp">+</span><span className="fl">Add client</span></button>
+        <button className={hl === 's' ? 'on' : ''} onClick={() => go('s')}>Calendar</button>
         {tabs.slice(3).map(([k, l, cls]) => (
-          <button
-            key={k}
-            className={
-              (cls || "") +
-              (hl === k || (k === "x" && "mrga".includes(hl)) ? " on" : "")
-            }
-            style={
-              (!owner && (k === "m" || k === "r")) || (!isAdmin && k === "a")
-                ? { display: "none" }
-                : undefined
-            }
-            onClick={() => go(k)}
-          >
-            {l}
-          </button>
+          <button key={k} className={(cls || '') + (hl === k || (k === 'x' && 'mrga'.includes(hl)) ? ' on' : '')}
+            style={(!owner && (k === 'm' || k === 'r')) || (!isAdmin && k === 'a') ? { display: 'none' } : undefined} onClick={() => go(k)}>{l}</button>
         ))}
       </nav>
-      <Sheet
-        open={!!sheet}
-        onClose={closeSheet}
-        alert={sheet?.t === "say" || sheet?.t === "ask"}
-      >
-        {sheet?.t === "form" && (
-          <ClientForm
-            key={sheet.id || "new"}
-            id={sheet.id}
-            C={CC}
-            P={P}
-            R={R}
-            team={T}
-            who={who}
-            owner={owner}
-            submit={submit}
-            onClose={closeSheet}
-            onSaved={(r) => {
-              closeSheet();
-              if (r.conflict) say(conflictMsg(r.name));
-            }}
-          />
-        )}
-        {sheet?.t === "pay" && (
-          <PayForm
-            id={sheet.id}
-            name={sheet.name}
-            submit={submit}
-            onClose={closeSheet}
-            onSaved={closeSheet}
-          />
-        )}
-        {sheet?.t === "pk" && (
-          <PkForm
-            p={sheet.p}
-            onClose={closeSheet}
-            onSaved={() => {
-              closeSheet();
-              refresh();
-            }}
-          />
-        )}
-        {sheet?.t === "whatsnew" && (
-          <WhatsNew since={sheet.since} onClose={closeSheet} />
-        )}
-        {sheet?.t === "sync" && (
-          <SyncBody
-            ops={failed}
-            onRetry={retryOp}
-            onDiscard={discardOp}
-            closeSheet={closeSheet}
-          />
-        )}
-        {sheet?.t === "say" && (
+      <Sheet open={!!sheet} onClose={closeSheet} alert={sheet?.t === 'say' || sheet?.t === 'ask'}>
+        {sheet?.t === 'form' && <ClientForm key={sheet.id || 'new'} id={sheet.id} C={CC} P={P} R={R} team={T} who={who} owner={owner} submit={submit} onClose={closeSheet}
+          onSaved={(r) => { closeSheet(); if (r.conflict) say(conflictMsg(r.name)) }} />}
+        {sheet?.t === 'pay' && <PayForm id={sheet.id} name={sheet.name} submit={submit} onClose={closeSheet} onSaved={closeSheet} />}
+        {sheet?.t === 'pk' && <PkForm p={sheet.p} onClose={closeSheet} onSaved={() => { closeSheet(); refresh() }} />}
+        {sheet?.t === 'whatsnew' && <WhatsNew since={sheet.since} onClose={closeSheet} />}
+        {sheet?.t === 'sync' && <SyncBody ops={failed} onRetry={retryOp} onDiscard={discardOp} closeSheet={closeSheet} />}
+        {sheet?.t === 'say' && <><h2>Notice</h2><p style={{ lineHeight: 1.55, marginTop: 8 }}>{sheet.text}</p><button className="btn p" style={{ width: '100%', marginTop: 16 }} onClick={closeSheet}>OK</button></>}
+        {sheet?.t === 'ask' && <AskBody key={sheet.text} sheet={sheet} closeSheet={closeSheet} />}
+        {sheet?.t === 'profile' && (
           <>
-            <h2>Notice</h2>
-            <p style={{ lineHeight: 1.55, marginTop: 8 }}>{sheet.text}</p>
-            <button
-              className="btn p"
-              style={{ width: "100%", marginTop: 16 }}
-              onClick={closeSheet}
-            >
-              OK
-            </button>
-          </>
-        )}
-        {sheet?.t === "ask" && (
-          <AskBody key={sheet.text} sheet={sheet} closeSheet={closeSheet} />
-        )}
-        {sheet?.t === "profile" && (
-          <>
-            <div style={{ textAlign: "center" }}>
-              <div
-                className="ph"
-                style={{
-                  width: 88,
-                  height: 88,
-                  margin: "0 auto 10px",
-                  fontSize: 34,
-                  ...phStyle,
-                }}
-              >
-                {profile.avatar ? "" : init}
-              </div>
-              <h2>{profile.name}</h2>
-              <p className="sub">{dl(profile.role)}</p>
-            </div>
-            <label className="btn" style={{ marginTop: 14 }}>
-              Change photo
-              <input
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={pickPhoto}
-              />
-            </label>
-            <button
-              className="btn"
-              style={{ width: "100%", marginTop: 8 }}
-              onClick={() => {
-                closeSheet();
-                go("g");
-              }}
-            >
-              Settings
-            </button>
-            <button
-              className="btn"
-              style={{ width: "100%", marginTop: 8 }}
-              onClick={() =>
-                setTheme(
-                  document.documentElement.dataset.theme === "dark"
-                    ? "light"
-                    : "dark",
-                )
-              }
-            >
-              {document.documentElement.dataset.theme === "dark"
-                ? "Switch to light mode"
-                : "Switch to dark mode"}
-            </button>
-            <button
-              className="btn o"
-              style={{ width: "100%", marginTop: 8 }}
-              onClick={signOut}
-            >
-              Sign out
-            </button>
-            <button
-              className="btn"
-              style={{ width: "100%", marginTop: 8 }}
-              onClick={closeSheet}
-            >
-              Close
-            </button>
+            <div style={{ textAlign: 'center' }}><div className="ph" style={{ width: 88, height: 88, margin: '0 auto 10px', fontSize: 34, ...phStyle }}>{profile.avatar ? '' : init}</div><h2>{profile.name}</h2><p className="sub">{dl(profile.role)}</p></div>
+            <label className="btn" style={{ marginTop: 14 }}>Change photo<input type="file" accept="image/*" style={{ display: 'none' }} onChange={pickPhoto} /></label>
+            <button className="btn" style={{ width: '100%', marginTop: 8 }} onClick={() => { closeSheet(); go('g') }}>Settings</button>
+            <button className="btn" style={{ width: '100%', marginTop: 8 }} onClick={() => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark')}>{document.documentElement.dataset.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}</button>
+            <button className="btn o" style={{ width: '100%', marginTop: 8 }} onClick={signOut}>Sign out</button>
+            <button className="btn" style={{ width: '100%', marginTop: 8 }} onClick={closeSheet}>Close</button>
           </>
         )}
       </Sheet>
     </>
-  );
+  )
 }
 
 /* ============ ROOT ============ */
