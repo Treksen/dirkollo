@@ -14,7 +14,7 @@ const Notes = ({ list }) => list.map((e) => (
 
 // Settings > App: version, check for updates, update now, what changed
 export function AppInfo({ X }) {
-  const { upd, waitingCount, isAdmin} = X;
+  const { upd, waitingCount, isAdmin } = X
   const [msg, setMsg] = useState('')
   async function check() {
     setMsg('')
@@ -26,83 +26,34 @@ export function AppInfo({ X }) {
   return (
     <>
       <div className="card srow">
-        <div className="sl">
-          <div className="lab">This app</div>
-          <div className="sub">The version running on this device.</div>
-        </div>
+        <div className="sl"><div className="lab">This app</div><div className="sub">The version running on this device.</div></div>
         <div className="sc">
-          <div className="row">
-            <span>Version</span>
-            <b>{APP_VERSION}</b>
-          </div>
-          {BUILD_TIME && (
-            <div className="row">
-              <span>Built</span>
-              <b>{when(BUILD_TIME)}</b>
-            </div>
-          )}
+          <div className="row"><span>Version</span><b>{APP_VERSION}</b></div>
+          {BUILD_TIME && <div className="row"><span>Built</span><b>{when(BUILD_TIME)}</b></div>}
         </div>
       </div>
       <div className="card srow">
-        <div className="sl">
-          <div className="lab">Updates</div>
-          <div className="sub">
-            New versions download quietly. Update when it suits you.
-          </div>
-        </div>
+        <div className="sl"><div className="lab">Updates</div><div className="sub">New versions download quietly. Update when it suits you.</div></div>
         <div className="sc">
-          {upd.needRefresh ? (
-            <div
-              className="warn"
-              style={{ background: "#e7f7ec", color: "#14532d" }}
-            >
-              A new version is ready.
-            </div>
-          ) : (
-            <div className="sub">
-              {upd.checking
-                ? "Checking…"
-                : upd.lastChecked
-                  ? "Last checked " + when(upd.lastChecked)
-                  : "Not checked yet in this session."}
-            </div>
-          )}
-          {msg && (
-            <div className="sub" style={{ marginTop: 6 }}>
-              {msg}
-            </div>
-          )}
-          {waitingCount > 0 && (
-            <div className="sub" style={{ marginTop: 6 }}>
-              You have {plural(waitingCount, "change")} waiting to send. They
-              are kept safely on this phone and send after the update.
-            </div>
-          )}
+          {upd.needRefresh
+            ? <div className="warn" style={{ background: '#e7f7ec', color: '#14532d' }}>A new version is ready.</div>
+            : <div className="sub">{upd.checking ? 'Checking…' : upd.lastChecked ? 'Last checked ' + when(upd.lastChecked) : 'Not checked yet in this session.'}</div>}
+          {msg && <div className="sub" style={{ marginTop: 6 }}>{msg}</div>}
+          {waitingCount > 0 && <div className="sub" style={{ marginTop: 6 }}>You have {plural(waitingCount, 'change')} waiting to send. They are kept safely on this phone and send after the update.</div>}
           <div className="act" style={{ marginTop: 10 }}>
-            <button className="btn" disabled={upd.checking} onClick={check}>
-              {upd.checking ? "Checking…" : "Check for updates"}
-            </button>
-            {upd.needRefresh && (
-              <button className="btn p" onClick={applyUpdate}>
-                Update now
-              </button>
-            )}
+            <button className="btn" disabled={upd.checking} onClick={check}>{upd.checking ? 'Checking…' : 'Check for updates'}</button>
+            {upd.needRefresh && <button className="btn p" onClick={applyUpdate}>Update now</button>}
           </div>
         </div>
       </div>
       {isAdmin && (
-        <div className="card srow">
-          <div className="sl">
-            <div className="lab">What's new</div>
-            <div className="sub">Recent changes.</div>
-          </div>
-          <div className="sc">
-            <Notes list={CHANGELOG.slice(0, 3)} />
-          </div>
-        </div>
+      <div className="card srow">
+        <div className="sl"><div className="lab">What's new</div><div className="sub">Recent changes.</div></div>
+        <div className="sc"><Notes list={CHANGELOG.slice(0, 3)} /></div>
+      </div>
       )}
     </>
-  );
+  )
 }
 
 // Shown once after the app has been updated

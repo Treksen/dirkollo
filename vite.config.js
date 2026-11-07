@@ -17,7 +17,7 @@ export default defineConfig({
       // 'prompt': a new version waits until the person taps Update, so a half-filled form is never wiped by a surprise reload
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['icons/icon-180.png'],
+      includeAssets: ['icons/*.png'],
       manifest: false,
       workbox: {
         // Never cache Supabase API calls: data must always be live.

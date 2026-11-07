@@ -291,10 +291,14 @@ function Studio({ session, profile, reloadProfile }) {
     if (!D.loaded) return
     try {
       const seen = localStorage.getItem('dk_seen_version')
-      if (seen && seen !== APP_VERSION && newerEntries(seen, APP_VERSION).length) setSheet({ t: 'whatsnew', since: seen })
+      if (seen && seen !== APP_VERSION) {
+        // release notes are for the Admin. Everyone else just gets a short confirmation.
+        if (!isAdmin) setSheet({ t: 'updated' })
+        else if (newerEntries(seen, APP_VERSION).length) setSheet({ t: 'whatsnew', since: seen })
+      }
       localStorage.setItem('dk_seen_version', APP_VERSION)
     } catch { /* storage blocked */ }
-  }, [D.loaded])
+  }, [D.loaded, isAdmin])
 
   if (!D.loaded) return <Loader label="Loading your studio" />
   // The Admin can require a minimum version. Only enforced online, so nobody is locked out of offline work. Admins are never blocked.
@@ -462,6 +466,7 @@ function Studio({ session, profile, reloadProfile }) {
           onSaved={(r) => { closeSheet(); if (r.conflict) say(conflictMsg(r.name)) }} />}
         {sheet?.t === 'pay' && <PayForm id={sheet.id} name={sheet.name} submit={submit} onClose={closeSheet} onSaved={closeSheet} />}
         {sheet?.t === 'pk' && <PkForm p={sheet.p} onClose={closeSheet} onSaved={() => { closeSheet(); refresh() }} />}
+        {sheet?.t === 'updated' && <><h2>App updated</h2><p style={{ lineHeight: 1.55, marginTop: 8 }}>You are now using the latest version.</p><button className="btn p" style={{ width: '100%', marginTop: 16 }} onClick={closeSheet}>OK</button></>}
         {sheet?.t === 'whatsnew' && <WhatsNew since={sheet.since} onClose={closeSheet} />}
         {sheet?.t === 'sync' && <SyncBody ops={failed} onRetry={retryOp} onDiscard={discardOp} closeSheet={closeSheet} />}
         {sheet?.t === 'say' && <><h2>Notice</h2><p style={{ lineHeight: 1.55, marginTop: 8 }}>{sheet.text}</p><button className="btn p" style={{ width: '100%', marginTop: 16 }} onClick={closeSheet}>OK</button></>}

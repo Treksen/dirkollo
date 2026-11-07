@@ -3,6 +3,13 @@ import { versionCmp } from './version'
 // Add a new entry at the TOP for every release, and bump "version" in package.json to match.
 export const CHANGELOG = [
   {
+    v: '2.5.4', date: '2026-11-04',
+    items: [
+      'The app icon is now the round logo on a transparent background (desktop and Android installs, browser tab).',
+      'After an update, only the Admin sees the release notes. Everyone else sees "App updated. You are now using the latest version."',
+    ],
+  },
+  {
     v: '2.5.3', date: '2026-11-03',
     items: ['Refreshing the page now keeps you on the page you were on (and the section inside Settings and Admin), instead of going back to Home.'],
   },
