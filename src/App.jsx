@@ -13,6 +13,8 @@ import { dl, plural } from './util'
 import { ClientForm, PayForm, PkForm, Detail } from './forms'
 import { Home, List, Cal, Money, Report, Hub } from './views'
 import { SettingsPg } from './settings'
+import { ErrorBoundary } from './ErrorBoundary'
+import { reportError } from './errors'
 import { MfaChallenge, MfaRequired } from './mfa'
 import { useDesktop } from './layout'
 import { ClientsDesk, HomeDesk } from './desk'
@@ -106,6 +108,7 @@ function Studio({ session, profile, reloadProfile }) {
   const desk = useDesktop()
   const upd = useUpdate()
   const [mfaOn, setMfaOn] = useState(null)
+  const [errCount, setErrCount] = useState(0)
   const [queue, setQueueState] = useState([])
   const [needSignIn, setNeedSignIn] = useState(false)
   const pend = useRef({ ids: new Set(), meta: false, full: false })
@@ -138,7 +141,7 @@ function Studio({ session, profile, reloadProfile }) {
       if (op.failed) continue
       const r = await runOp(op)
       if (r.net) { results[op.opid] = { net: true }; break }
-      if (r.error) { op.failed = true; op.err = r.error; results[op.opid] = { error: r.error }; continue }
+      if (r.error) { op.failed = true; op.err = r.error; results[op.opid] = { error: r.error }; reportError({ message: 'Sync failed: ' + r.error, stack: '' }, 'sync'); continue }
       results[op.opid] = { ok: true, conflict: r.conflict }
       list = list.filter((x) => x.opid !== op.opid)
       okIds.add(op.id)
@@ -286,6 +289,19 @@ function Studio({ session, profile, reloadProfile }) {
     supabase.auth.mfa.listFactors().then(({ data }) => setMfaOn(!!(data && data.totp && data.totp.length)), () => {})
   }, [D.loaded, owner])
 
+  // Admin only: how many reported app errors are still open
+  useEffect(() => {
+    if (!D.loaded || !isAdmin) return undefined
+    const look = () => {
+      if (!navigator.onLine) return
+      supabase.from('error_log').select('fingerprint', { count: 'exact', head: true }).eq('resolved', false)
+        .then(({ count }) => setErrCount(count || 0), () => {})
+    }
+    look()
+    const t = setInterval(look, 10 * 60 * 1000)
+    return () => clearInterval(t)
+  }, [D.loaded, isAdmin])
+
   // After an update, show what changed (once)
   useEffect(() => {
     if (!D.loaded) return
@@ -410,6 +426,12 @@ function Studio({ session, profile, reloadProfile }) {
         </button>
         <div className="in"><Brand /></div>
       </div>
+      {isAdmin && errCount > 0 && (
+        <div className="offl bad" role="status">
+          {plural(errCount, 'app error')} {errCount === 1 ? 'needs' : 'need'} a look.
+          <button className="chip" onClick={() => { try { sessionStorage.setItem('dk_admin_sec', 'err') } catch { /* ignore */ } go('a') }}>Open errors</button>
+        </div>
+      )}
       {upd.needRefresh && (
         <div className="offl upd" role="status">
           A new version of the app is ready.
@@ -448,7 +470,9 @@ function Studio({ session, profile, reloadProfile }) {
         <div id="view">
           {!c && 'mrga'.includes(tab) && (tab === 'g' || owner) && <button className="back mbo" onClick={() => go('x')}>‹ More</button>}
           {D.err && <div className="warn">{D.err}</div>}
-          {tab === 'c' && desk ? <ClientsDesk X={X} selId={det} panel={c ? detailEl(c, true) : null} /> : c ? detailEl(c, false) : <View X={X} />}
+          <ErrorBoundary key={tab + ':' + (det || '')} page>
+            {tab === 'c' && desk ? <ClientsDesk X={X} selId={det} panel={c ? detailEl(c, true) : null} /> : c ? detailEl(c, false) : <View X={X} />}
+          </ErrorBoundary>
         </div>
       </div>
       <nav className="tabs">

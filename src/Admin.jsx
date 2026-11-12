@@ -3,6 +3,7 @@ import { plural } from './util'
 import { useDesktop, SideNav } from './layout'
 import { APP_VERSION, versionCmp, versionLt } from './version'
 import { encryptText, decryptText, isEncrypted } from './crypto'
+import { reportError } from './errors'
 
 // sensitive actions go in the activity log (best effort)
 const logEvent = (action, note) => supabase.rpc('log_event', { p_action: action, p_note: note }).then(() => {}, () => {})
@@ -499,18 +500,70 @@ function Devices({ T, run }) {
   )
 }
 
+/* ---------- ERRORS: what went wrong in the app (Admin only) ---------- */
+function ErrorsPanel({ T, say }) {
+  const [rows, setRows] = useState([])
+  const [view, setView] = useState('open')
+  const [err, setErr] = useState('')
+  const load = useCallback(async () => {
+    const { data, error } = await supabase.from('error_log').select('*').order('last_at', { ascending: false }).limit(200)
+    if (error) setErr(error.message); else { setErr(''); setRows(data) }
+  }, [])
+  useEffect(() => { load() }, [load])
+  const who = (id) => T.find((u) => u.id === id)?.name || 'Unknown'
+  const shown = rows.filter((r) => (view === 'open' ? !r.resolved : view === 'done' ? r.resolved : true))
+  const change = async (q) => { const { error } = await q; if (error) say(error.message); else load() }
+  const copy = (r) => {
+    const t = '[' + r.kind + '] ' + r.message + '\nSeen ' + r.count + ' times, last ' + ago(r.last_at) + '. Version ' + r.version + ', ' + r.agent + ', page ' + r.page + '.\n' + (r.stack || '')
+    navigator.clipboard?.writeText(t).then(() => say('Copied. Paste it to your developer.'), () => say('Could not copy.'))
+  }
+  return (
+    <>
+      <div className="sub" style={{ marginBottom: 10 }}>Crashes and failures from everyone's phones appear here, and only you can see them. Nothing about clients is collected: phone numbers, emails and long numbers are removed first. The same mistake is counted, not listed again.</div>
+      {err && <div className="warn" style={{ marginBottom: 10 }}>{err} (New projects: run supabase/setup.sql. Existing projects: run supabase/error-log-update.sql.)</div>}
+      <div className="pipe">{[['open', 'Open'], ['done', 'Resolved'], ['all', 'All']].map((a) => <button key={a[0]} className={view === a[0] ? 'on' : ''} onClick={() => setView(a[0])}>{a[1]}</button>)}</div>
+      <div className="act" style={{ marginBottom: 12 }}>
+        <button className="btn" onClick={() => { reportError(new Error('Test error sent from Admin, Errors'), 'test'); say('Test error sent. Tap Open in a few seconds and it should appear here.'); setTimeout(load, 3000) }}>Send a test error</button>
+        <button className="btn" disabled={!rows.some((r) => !r.resolved)} onClick={() => change(supabase.from('error_log').update({ resolved: true }).eq('resolved', false))}>Resolve all</button>
+        <button className="btn" disabled={!rows.some((r) => r.resolved)} onClick={() => change(supabase.from('error_log').delete().eq('resolved', true))}>Delete resolved</button>
+      </div>
+      <div className="mason">
+        {shown.map((r) => (
+          <div key={r.fingerprint} className="card">
+            <div className="head"><div><h3 style={{ wordBreak: 'break-word' }}>{r.message}</h3><p>{r.kind} · {r.page || 'App'}</p></div>
+              <span className={'sb ' + (r.resolved ? 'Delivered' : 'Overdue')}>{r.resolved ? 'Resolved' : r.count + ' time' + (r.count === 1 ? '' : 's')}</span></div>
+            <div className="row"><span>Last seen</span><b>{ago(r.last_at)}</b></div>
+            <div className="row"><span>First seen</span><b>{ago(r.first_at)}</b></div>
+            <div className="row"><span>Version</span><b>{r.version || 'unknown'}</b></div>
+            <div className="row"><span>People affected</span><b>{(r.users || []).map(who).join(', ') || 'unknown'}</b></div>
+            <div className="row"><span>Device</span><b>{r.agent || 'unknown'}</b></div>
+            {r.stack && <details style={{ marginTop: 8 }}><summary className="sub" style={{ cursor: 'pointer' }}>Technical details</summary><pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11, margin: '6px 0 0' }}>{r.stack}</pre></details>}
+            <div className="act" style={{ marginTop: 10 }}>
+              <button className="chip" onClick={() => copy(r)}>Copy details</button>
+              <button className="chip" onClick={() => change(supabase.from('error_log').update({ resolved: !r.resolved }).eq('fingerprint', r.fingerprint))}>{r.resolved ? 'Reopen' : 'Mark resolved'}</button>
+              <button className="chip" onClick={() => change(supabase.from('error_log').delete().eq('fingerprint', r.fingerprint))}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {!shown.length && !err && <div className="empty">{view === 'open' ? 'No open errors. All is well.' : 'Nothing here.'}</div>}
+    </>
+  )
+}
+
 export function Admin({ C, A, T, S, say, ask, run, reload, closeSheet }) {
   const [sec, setSec] = useState(() => {
-    try { const v = sessionStorage.getItem('dk_admin_sec'); return ['ov', 'log', 'data', 'dev', 'st'].includes(v) ? v : 'ov' } catch { return 'ov' }
+    try { const v = sessionStorage.getItem('dk_admin_sec'); return ['ov', 'log', 'data', 'dev', 'err', 'st'].includes(v) ? v : 'ov' } catch { return 'ov' }
   })
   useEffect(() => { try { sessionStorage.setItem('dk_admin_sec', sec) } catch { /* ignore */ } }, [sec])
   const desk = useDesktop()
-  const items = [['ov', 'Overview'], ['log', 'Activity'], ['data', 'Data tools'], ['dev', 'Devices'], ['st', 'Studio']]
+  const items = [['ov', 'Overview'], ['log', 'Activity'], ['data', 'Data tools'], ['dev', 'Devices'], ['err', 'Errors'], ['st', 'Studio']]
   const body = (
     <>
       {sec === 'ov' && <Overview C={C} A={A} T={T} />}
       {sec === 'log' && <Activity C={C} T={T} />}
       {sec === 'dev' && <Devices T={T} run={run} />}
+      {sec === 'err' && <ErrorsPanel T={T} say={say} />}
       {sec === 'data' && <DataTools C={C} A={A} T={T} isAdmin say={say} ask={ask} run={run} reload={reload} closeSheet={closeSheet} />}
       {sec === 'st' && <StudioSettings S={S} reload={reload} say={say} />}
     </>

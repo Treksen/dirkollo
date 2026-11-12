@@ -3,6 +3,14 @@ import { versionCmp } from './version'
 // Add a new entry at the TOP for every release, and bump "version" in package.json to match.
 export const CHANGELOG = [
   {
+    v: '2.6.0', date: '2026-11-08',
+    items: [
+      'Admin > Errors: crashes and failures from everyone\'s phones are collected for the Admin only, with no client details. A banner tells the Admin when new errors need a look.',
+      'If a page crashes, a friendly message appears instead of a blank screen.',
+      'One-file database setup for new projects (supabase/setup.sql).',
+    ],
+  },
+  {
     v: '2.5.4', date: '2026-11-04',
     items: [
       'The app icon is now the round logo on a transparent background (desktop and Android installs, browser tab).',
