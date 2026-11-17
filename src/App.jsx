@@ -22,21 +22,22 @@ import { useUpdate, applyUpdate } from './updater'
 import { UpdateRequired, WhatsNew } from './appinfo'
 import { APP_VERSION, versionLt } from './version'
 import { newerEntries } from './changelog'
+import { TAB_PATH, pathToTab, tabToPath, allowedTab, syncPath } from './route'
 
 const applyMeta = (r) => {
   if (r.S && r.S.currency != null && r.S.currency !== getCur()) setCur(r.S.currency)
   if (r.S) setLimits(r.S.stageLimits)
 }
-// Where the person was, kept for this browser tab so a refresh returns to the same page (not the dashboard)
-const TABS = ['h', 'c', 's', 'm', 'r', 'g', 'a', 'x']
+// Which page is open comes from the web address (/payments, /reports ...). The copy kept for this browser tab only remembers
+// the small details inside a page (client, filter, month) and is a fallback for addresses we do not know.
 function readNav(owner, isAdmin) {
   let n = {}
   try { n = JSON.parse(sessionStorage.getItem('dk_nav') || '{}') || {} } catch { n = {} }
-  let tab = TABS.includes(n.tab) ? n.tab : 'h'
-  if ((!owner && (tab === 'm' || tab === 'r')) || (!isAdmin && tab === 'a')) tab = 'h'
+  const saved = Object.keys(TAB_PATH).includes(n.tab) ? n.tab : 'h'
+  const tab = allowedTab(pathToTab(location.pathname) || saved, owner, isAdmin)
   return {
     tab,
-    det: typeof n.det === 'string' ? n.det : null,
+    det: n.tab === tab && typeof n.det === 'string' ? n.det : null, // an open client belongs to the page it was opened on
     sg: ['ac', 'tm', 'pk', 'dt', 'ap'].includes(n.sg) ? n.sg : 'ac',
     flt: typeof n.flt === 'string' ? n.flt : 'All',
     sd: /^\d{4}-\d{2}-\d{2}$/.test(n.sd || '') ? n.sd : null,
@@ -227,7 +228,11 @@ function Studio({ session, profile, reloadProfile }) {
       sessionStorage.setItem('dk_nav', JSON.stringify({ tab, det, sg, flt, sd, cm: cm.getFullYear() + '-' + String(cm.getMonth() + 1).padStart(2, '0') }))
     } catch { /* storage blocked */ }
   }, [tab, det, sg, flt, sd, cm])
-  useEffect(() => { try { history.replaceState({ t: tab, d: det }, '') } catch { /* ignore */ } }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // whatever changed the page, the address must match what is on screen (also fixes a page the person is not allowed to open)
+    const fix = syncPath(location.pathname, tab, owner, isAdmin)
+    try { history.replaceState({ t: tab, d: det }, '', fix || undefined) } catch { /* ignore */ }
+  }, [tab, det, owner, isAdmin])
 
   // keep a saved copy of everything on this phone, so the lists open with no signal
   useEffect(() => {
@@ -268,10 +273,13 @@ function Studio({ session, profile, reloadProfile }) {
   }, [theme])
   useEffect(() => {
     const h = (e) => { e.preventDefault(); setInst(e) }
-    const pop = (e) => { const s = e.state; setTab(s ? s.t : 'h'); setDet(s ? s.d : null) }
+    const pop = (e) => {
+      setTab(allowedTab(pathToTab(location.pathname) || (e.state && e.state.t) || 'h', owner, isAdmin))
+      setDet(e.state && typeof e.state.d === 'string' ? e.state.d : null)
+    }
     addEventListener('beforeinstallprompt', h); addEventListener('popstate', pop)
     return () => { removeEventListener('beforeinstallprompt', h); removeEventListener('popstate', pop) }
-  }, [])
+  }, [owner, isAdmin])
 
   useEffect(() => {
     if (!D.loaded) return
@@ -328,7 +336,14 @@ function Studio({ session, profile, reloadProfile }) {
   const CC = C.map((c) => (pendIds.has(c.id) ? { ...c, pending: true } : c))
   const AA = A
   const failed = queue.filter((o) => o.failed)
-  const go = (t, d) => { setTab(t); setDet(d || null); scrollTo(0, 0); try { history.pushState({ t, d: d || null }, '') } catch { /* ignore */ } }
+  const go = (t, d) => {
+    setTab(t); setDet(d || null); scrollTo(0, 0)
+    try {
+      const path = tabToPath(allowedTab(t, owner, isAdmin))
+      const st = { t, d: d || null }
+      if (location.pathname !== path) history.pushState(st, '', path); else history.replaceState(st, '', path)
+    } catch { /* ignore */ }
+  }
   const say = (text) => setSheet({ t: 'say', text })
   const ask = (text, label, fn, danger, word) => setSheet({ t: 'ask', text, label, fn, danger, word })
   const vis = CC.filter((c) => !END.includes(c.status) && (owner || c.assign.includes(myid)))

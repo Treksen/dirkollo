@@ -22,6 +22,7 @@ export default defineConfig({
       workbox: {
         // Never cache Supabase API calls: data must always be live.
         navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//], // the calendar link must reach the server, not the app
         runtimeCaching: [
           { urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i, handler: 'StaleWhileRevalidate', options: { cacheName: 'fonts' } }
         ]

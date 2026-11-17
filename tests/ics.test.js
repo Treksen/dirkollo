@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildIcs, esc, fold } from '../netlify/functions/ics.js'
+import { buildIcs, esc, fold } from '../lib/ics.js'
 
 const now = new Date('2026-10-30T08:00:00Z')
 const row = (o) => ({ id: 'abc', name: 'Jane & John, Doe', event_type: 'Wedding', session_date: '2026-12-05', session_time: '13:00:00', duration_hrs: 2, location: 'Karen; Nairobi', status: 'Booked', assigned: 'Admin Treks', ...o })
